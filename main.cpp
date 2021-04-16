@@ -6,10 +6,10 @@
 #pragma comment(linker,"/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #pragma comment(lib, "comctl32.lib")
 
-HINSTANCE instance_;
-
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
-class __declspec(uuid("6dfaf0ab-7597-4e42-9ebb-da484ea5081c")) TrayIcon;
+UINT const TRAY_ID = 0;
+
+HINSTANCE instance_;
 
 PCWSTR enabledIcon_;
 PCWSTR disabledIcon_;
@@ -32,8 +32,8 @@ BOOL add_icon(HWND wnd)
 	NOTIFYICONDATA icon = {};
 	icon.cbSize = sizeof(icon);
 	icon.hWnd = wnd;
-	icon.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP | NIF_GUID;
-	icon.guidItem = __uuidof(TrayIcon);
+	icon.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP;
+	icon.uID = TRAY_ID;
 	icon.uCallbackMessage = WMAPP_NOTIFYCALLBACK;
 
 	LoadIconMetric(instance_, disabledIcon_, LIM_SMALL, &icon.hIcon);
@@ -46,21 +46,23 @@ BOOL add_icon(HWND wnd)
 	return Shell_NotifyIcon(NIM_SETVERSION, &icon);
 }
 
-BOOL remove_icon()
+BOOL remove_icon(HWND wnd)
 {
 	NOTIFYICONDATA icon = {};
 	icon.cbSize = sizeof(icon);
-	icon.uFlags = NIF_GUID;
-	icon.guidItem = __uuidof(TrayIcon);
+	icon.uFlags = 0;
+	icon.uID = TRAY_ID;
+	icon.hWnd = wnd;
 	return Shell_NotifyIcon(NIM_DELETE, &icon);
 }
 
-BOOL switch_icon(PCWSTR to)
+BOOL switch_icon(HWND wnd, PCWSTR to)
 {
 	NOTIFYICONDATA icon = {};
 	icon.cbSize = sizeof(icon);
-	icon.uFlags = NIF_ICON | NIF_GUID;
-	icon.guidItem = __uuidof(TrayIcon);
+	icon.uFlags = NIF_ICON;
+	icon.uID = TRAY_ID;
+	icon.hWnd = wnd;
 	
 	LoadIconMetric(instance_, to, LIM_SMALL, &icon.hIcon);
 
@@ -94,7 +96,7 @@ void flip_state(HWND wnd)
 		to = disabledIcon_;
 	}
 
-	if(!switch_icon(to))
+	if(!switch_icon(wnd, to))
 	{
 		MessageBox(wnd, L"Failed to modify tray icon", L"Error", MB_OK);
 	}
@@ -108,6 +110,7 @@ LRESULT CALLBACK window_proc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if(!add_icon(wnd))
 		{
 			MessageBox(wnd, L"Failed to add tray icon", L"Fatal Error", MB_OK);
+			abort();
 		}
 		break;
 	case WMAPP_NOTIFYCALLBACK:
@@ -122,7 +125,7 @@ LRESULT CALLBACK window_proc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_DESTROY:
-		if(!remove_icon())
+		if(!remove_icon(wnd))
 		{
 			MessageBox(wnd, L"Failed to destroy tray icon properly", L"Error", MB_OK);
 		}
@@ -136,6 +139,7 @@ LRESULT CALLBACK window_proc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 INT WINAPI WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR cmdLine, int showCmd)
 {
 	instance_ = instance;
+
 	enabledIcon_ = MAKEINTRESOURCE(IDI_ENABLED);
 	disabledIcon_ = MAKEINTRESOURCE(IDI_DISABLED);
 
